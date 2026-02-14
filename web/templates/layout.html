@@ -1,0 +1,64 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} — roadmap</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/sortable.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1><a href="/">roadmap</a></h1>
+        {{if .ProjectName}}<nav><a href="/projects/{{.ProjectID}}">{{.ProjectName}}</a></nav>{{end}}
+    </header>
+    <main>
+        {{.Content}}
+    </main>
+</div>
+<script>
+document.body.addEventListener('htmx:afterSettle', function() {
+    initSortables();
+});
+function initSortables() {
+    document.querySelectorAll('.task-list:not(.sortable-initialized)').forEach(function(el) {
+        el.classList.add('sortable-initialized');
+        new Sortable(el, {
+            group: 'tasks',
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            onEnd: function(evt) {
+                var taskId = evt.item.dataset.taskId;
+                var newIndex = evt.newIndex;
+                htmx.ajax('PUT', '/tasks/' + taskId + '/order', {
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    values: {position: newIndex}
+                });
+            }
+        });
+    });
+    document.querySelectorAll('.phase-container:not(.sortable-initialized)').forEach(function(el) {
+        el.classList.add('sortable-initialized');
+        new Sortable(el, {
+            animation: 150,
+            handle: '.phase-drag-handle',
+            ghostClass: 'sortable-ghost',
+            draggable: '.phase',
+            onEnd: function(evt) {
+                var phaseId = evt.item.dataset.phaseId;
+                var newIndex = evt.newIndex;
+                htmx.ajax('PUT', '/phases/' + phaseId + '/order', {
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    values: {position: newIndex}
+                });
+            }
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initSortables);
+</script>
+</body>
+</html>{{end}}

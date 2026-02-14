@@ -16,26 +16,50 @@ func statusIcon(status string) string {
 	}
 }
 
-// FormatList groups tasks by phase and formats them for display.
-func FormatList(tasks []Task) string {
-	phases := groupByPhase(tasks)
-	order := phaseOrder(tasks)
+// FormatList groups tasks by phase (using Phase entities) and formats them for display.
+func FormatList(phases []Phase, tasks []Task) string {
+	// Build a map of phase_id -> tasks
+	phaseTaskMap := make(map[int64][]Task)
+	var backlog []Task
+	for _, t := range tasks {
+		if t.PhaseID.Valid {
+			phaseTaskMap[t.PhaseID.Int64] = append(phaseTaskMap[t.PhaseID.Int64], t)
+		} else {
+			backlog = append(backlog, t)
+		}
+	}
 
 	var b strings.Builder
-	for i, phase := range order {
-		if i > 0 {
+	first := true
+
+	// Print phases in order
+	for _, phase := range phases {
+		phaseTasks := phaseTaskMap[int64(phase.ID)]
+		if len(phaseTasks) == 0 {
+			continue
+		}
+		if !first {
 			b.WriteString("\n")
 		}
-		label := phase
-		if label == "" {
-			label = "(no phase)"
-		}
-		b.WriteString(label)
+		first = false
+		b.WriteString(phase.Title)
 		b.WriteString("\n")
-		for _, t := range phases[phase] {
+		for _, t := range phaseTasks {
 			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
 		}
 	}
+
+	// Print backlog (tasks without phase)
+	if len(backlog) > 0 {
+		if !first {
+			b.WriteString("\n")
+		}
+		b.WriteString("(backlog)\n")
+		for _, t := range backlog {
+			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
+		}
+	}
+
 	return b.String()
 }
 
@@ -66,31 +90,10 @@ func compactList(tasks []Task, showPhase bool) string {
 	parts := make([]string, len(tasks))
 	for i, t := range tasks {
 		s := fmt.Sprintf("#%d %s", t.ID, t.Title)
-		if showPhase && t.Phase != "" {
-			s += fmt.Sprintf(" [%s]", t.Phase)
+		if showPhase && t.PhaseTitle != "" {
+			s += fmt.Sprintf(" [%s]", t.PhaseTitle)
 		}
 		parts[i] = s
 	}
 	return strings.Join(parts, " | ")
-}
-
-func groupByPhase(tasks []Task) map[string][]Task {
-	m := make(map[string][]Task)
-	for _, t := range tasks {
-		m[t.Phase] = append(m[t.Phase], t)
-	}
-	return m
-}
-
-// phaseOrder returns phases in first-seen order.
-func phaseOrder(tasks []Task) []string {
-	seen := make(map[string]bool)
-	var order []string
-	for _, t := range tasks {
-		if !seen[t.Phase] {
-			seen[t.Phase] = true
-			order = append(order, t.Phase)
-		}
-	}
-	return order
 }

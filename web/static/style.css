@@ -1,0 +1,70 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#252525;--border:#333;
+  --text:#e0e0e0;--text2:#888;--accent:#6c9;--accent2:#4a7;
+  --red:#e55;--yellow:#ec3;--blue:#5af;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.container{max-width:960px;margin:0 auto;padding:1.5rem}
+header{border-bottom:1px solid var(--border);padding-bottom:1rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.25rem;font-weight:600}
+header h1 a{color:var(--text)}
+header nav a{margin-left:1rem;color:var(--text2);font-size:.875rem}
+header nav a:hover{color:var(--text)}
+
+/* Projects list */
+.project-card{display:block;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-bottom:.75rem;transition:border-color .15s}
+.project-card:hover{border-color:var(--accent);text-decoration:none}
+.project-card h2{font-size:1rem;font-weight:500;color:var(--text)}
+.project-card .path{font-size:.8rem;color:var(--text2);margin-top:.25rem}
+
+/* Phase board */
+.phase{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem}
+.phase-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;gap:.5rem}
+.phase-header h3{font-size:.95rem;font-weight:600;flex:1}
+.phase-header .phase-actions{display:flex;gap:.25rem}
+.backlog-header{color:var(--text2);font-style:italic}
+
+/* Tasks */
+.task-list{min-height:2rem}
+.task{display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:4px;background:var(--surface2);margin-bottom:.35rem;font-size:.875rem}
+.task:hover{background:var(--border)}
+.task .drag-handle{cursor:grab;color:var(--text2);font-size:.75rem;padding:0 .25rem}
+.task .task-id{color:var(--text2);font-size:.8rem;min-width:2.5rem}
+.task .task-title{flex:1}
+.task .task-title input{background:transparent;border:1px solid var(--accent);color:var(--text);padding:.15rem .35rem;border-radius:3px;width:100%;font-size:.875rem}
+.task .task-status{font-size:.75rem;padding:.1rem .4rem;border-radius:3px;cursor:pointer;border:none;color:#fff}
+.status-pending{background:#555}
+.status-active{background:var(--blue)}
+.status-done{background:var(--accent2)}
+.task .task-actions{display:flex;gap:.15rem}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.25rem;padding:.3rem .6rem;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.8rem;cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--border)}
+.btn-sm{padding:.15rem .35rem;font-size:.75rem}
+.btn-accent{border-color:var(--accent);color:var(--accent)}
+.btn-accent:hover{background:var(--accent);color:var(--bg)}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+
+/* Forms */
+.add-form{display:flex;gap:.5rem;margin-top:.5rem}
+.add-form input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.35rem .5rem;border-radius:4px;font-size:.875rem}
+.add-form input[type=text]:focus{outline:none;border-color:var(--accent)}
+.add-form input[type=text]::placeholder{color:var(--text2)}
+
+.phase-form{display:flex;gap:.5rem;margin-bottom:1rem}
+.phase-form input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.4rem .6rem;border-radius:4px;font-size:.875rem}
+.phase-form input[type=text]:focus{outline:none;border-color:var(--accent)}
+
+/* Empty state */
+.empty{text-align:center;color:var(--text2);padding:3rem 1rem;font-size:.9rem}
+
+/* Sortable ghost */
+.sortable-ghost{opacity:.3}
+.sortable-drag{opacity:.9}
+
+/* htmx indicator */
+.htmx-indicator{display:none}.htmx-request .htmx-indicator,.htmx-request.htmx-indicator{display:inline}

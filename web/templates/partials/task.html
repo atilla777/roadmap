@@ -1,0 +1,15 @@
+{{define "task"}}
+<div class="task" data-task-id="{{.ID}}">
+    <span class="drag-handle">⠿</span>
+    <span class="task-id">#{{.ID}}</span>
+    <span class="task-title">{{.Title}}</span>
+    <button class="task-status status-{{.Status}}"
+            hx-put="/tasks/{{.ID}}"
+            hx-vals='{"status":"{{nextStatus .Status}}"}'
+            hx-target="closest .task"
+            hx-swap="outerHTML">{{.Status}}</button>
+    <div class="task-actions">
+        <button class="btn btn-sm btn-danger" hx-delete="/tasks/{{.ID}}" hx-target="closest .task" hx-swap="outerHTML">✕</button>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,12 @@
+{{define "projects-content"}}
+{{if .Projects}}
+{{range .Projects}}
+<a class="project-card" href="/projects/{{.ID}}">
+    <h2>{{.Name}}</h2>
+    {{if .Path}}<div class="path">{{.Path}}</div>{{end}}
+</a>
+{{end}}
+{{else}}
+<div class="empty">No projects yet. Create one with <code>roadmap project add "name"</code></div>
+{{end}}
+{{end}}

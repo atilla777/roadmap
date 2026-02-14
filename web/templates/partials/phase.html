@@ -1,0 +1,20 @@
+{{define "phase"}}
+<div class="phase" data-phase-id="{{.Phase.ID}}">
+    <div class="phase-header">
+        <span class="phase-drag-handle drag-handle">⠿</span>
+        <h3>{{.Phase.Title}}</h3>
+        <div class="phase-actions">
+            <button class="btn btn-sm btn-danger" hx-delete="/phases/{{.Phase.ID}}" hx-target="closest .phase" hx-swap="outerHTML" hx-confirm="Delete phase? Tasks will move to backlog.">✕</button>
+        </div>
+    </div>
+    <div class="task-list" data-phase-id="{{.Phase.ID}}">
+    {{range .Tasks}}
+    {{template "task" .}}
+    {{end}}
+    </div>
+    <form class="add-form" hx-post="/phases/{{.Phase.ID}}/tasks" hx-target="previous .task-list" hx-swap="beforeend" hx-on::after-request="this.reset()">
+        <input type="text" name="title" placeholder="Add task..." required>
+        <button class="btn btn-sm btn-accent" type="submit">+</button>
+    </form>
+</div>
+{{end}}

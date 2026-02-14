@@ -19,6 +19,12 @@ project commands:
   project list                      list all projects
   project remove "name"             delete project and its tasks
 
+phase commands:
+  phase add "title"           create a phase
+  phase list                  list phases in order
+  phase remove <id>           delete phase (tasks move to backlog)
+  phase move <id> <position>  reorder a phase
+
 task commands:
   add "title" [--phase "P"]   add a pending task
   start <id>                  mark task as active
@@ -28,7 +34,11 @@ task commands:
   list                        all tasks grouped by phase
   context                     compact LLM summary
   edit <id> --title/--phase   edit a task
-  remove <id>                 delete a task`)
+  move <id> <position>        reorder a task within its phase
+  remove <id>                 delete a task
+
+web:
+  serve [--port 8080]         start web interface`)
 }
 
 func main() {
@@ -76,8 +86,36 @@ func main() {
 		return
 	}
 
-	// Resolve project for task commands
+	// Serve command
+	if cmd == "serve" {
+		cmdServe(db, rest)
+		return
+	}
+
+	// Resolve project for task/phase commands
 	proj := resolveProject(db, projectFlag)
+
+	// Phase subcommands
+	if cmd == "phase" {
+		if len(rest) < 1 {
+			fmt.Fprintln(os.Stderr, "usage: roadmap phase <add|list|remove|move> ...")
+			os.Exit(1)
+		}
+		switch rest[0] {
+		case "add":
+			cmdPhaseAdd(db, proj.ID, rest[1:])
+		case "list":
+			cmdPhaseList(db, proj.ID)
+		case "remove":
+			cmdPhaseRemove(db, proj.ID, rest[1:])
+		case "move":
+			cmdPhaseMove(db, proj.ID, rest[1:])
+		default:
+			fmt.Fprintf(os.Stderr, "unknown phase command: %s\n", rest[0])
+			os.Exit(1)
+		}
+		return
+	}
 
 	switch cmd {
 	case "add":
@@ -96,6 +134,8 @@ func main() {
 		cmdContext(db, proj.ID, proj.Name)
 	case "edit":
 		cmdEdit(db, proj.ID, rest)
+	case "move":
+		cmdMove(db, proj.ID, rest)
 	case "remove":
 		cmdRemove(db, proj.ID, rest)
 	case "help", "--help", "-h":
