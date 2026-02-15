@@ -17,23 +17,25 @@ global flags:
 project commands:
   project add "name" [--path /dir]  create a project (path defaults to cwd)
   project list                      list all projects
+  project edit "name" --name/--desc edit project
   project remove "name"             delete project and its tasks
 
 phase commands:
-  phase add "title"           create a phase
-  phase list                  list phases in order
-  phase remove <id>           delete phase (tasks move to backlog)
-  phase move <id> <position>  reorder a phase
+  phase add "title" [--desc "..."]   create a phase
+  phase list                        list phases in order
+  phase edit <id> --title/--desc    edit a phase
+  phase remove <id>                 delete phase (tasks move to backlog)
+  phase move <id> <position>        reorder a phase
 
 task commands:
-  add "title" [--phase "P"]   add a pending task
+  add "title" [--phase "P"] [--desc "..."]  add a pending task
   start <id>                  mark task as active
   done [id]                   mark task as done (default: single active)
   current                     show active tasks
   next                        show next 5 pending tasks
   list                        all tasks grouped by phase
   context                     compact LLM summary
-  edit <id> --title/--phase   edit a task
+  edit <id> --title/--phase/--desc  edit a task
   move <id> <position>        reorder a task within its phase
   remove <id>                 delete a task
 
@@ -77,6 +79,8 @@ func main() {
 			cmdProjectAdd(db, rest[1:])
 		case "list":
 			cmdProjectList(db)
+		case "edit":
+			cmdProjectEdit(db, rest[1:])
 		case "remove":
 			cmdProjectRemove(db, rest[1:])
 		default:
@@ -106,6 +110,8 @@ func main() {
 			cmdPhaseAdd(db, proj.ID, rest[1:])
 		case "list":
 			cmdPhaseList(db, proj.ID)
+		case "edit":
+			cmdPhaseEdit(db, proj.ID, rest[1:])
 		case "remove":
 			cmdPhaseRemove(db, proj.ID, rest[1:])
 		case "move":
@@ -149,7 +155,7 @@ func main() {
 
 func resolveProject(db *sql.DB, flagName string) Project {
 	if flagName != "" {
-		row := db.QueryRow(`SELECT id, name, path, created_at FROM projects WHERE name = ?`, flagName)
+		row := db.QueryRow(`SELECT id, name, path, description, created_at FROM projects WHERE name = ?`, flagName)
 		p, err := scanProject(row)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "project %q not found\n", flagName)
@@ -165,7 +171,7 @@ func resolveProject(db *sql.DB, flagName string) Project {
 		os.Exit(1)
 	}
 
-	rows, err := db.Query(`SELECT id, name, path, created_at FROM projects WHERE path != '' ORDER BY length(path) DESC`)
+	rows, err := db.Query(`SELECT id, name, path, description, created_at FROM projects WHERE path != '' ORDER BY length(path) DESC`)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

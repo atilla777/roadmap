@@ -16,6 +16,22 @@ func statusIcon(status string) string {
 	}
 }
 
+// indentDesc formats a description with the given indent prefix.
+// Returns empty string if description is empty.
+func indentDesc(desc, indent string) string {
+	desc = strings.TrimSpace(desc)
+	if desc == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, line := range strings.Split(desc, "\n") {
+		b.WriteString(indent)
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 // FormatList groups tasks by phase (using Phase entities) and formats them for display.
 func FormatList(phases []Phase, tasks []Task) string {
 	// Build a map of phase_id -> tasks
@@ -44,8 +60,10 @@ func FormatList(phases []Phase, tasks []Task) string {
 		first = false
 		b.WriteString(phase.Title)
 		b.WriteString("\n")
+		b.WriteString(indentDesc(phase.Description, "  "))
 		for _, t := range phaseTasks {
 			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
+			b.WriteString(indentDesc(t.Description, "         "))
 		}
 	}
 
@@ -57,6 +75,7 @@ func FormatList(phases []Phase, tasks []Task) string {
 		b.WriteString("(backlog)\n")
 		for _, t := range backlog {
 			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
+			b.WriteString(indentDesc(t.Description, "         "))
 		}
 	}
 

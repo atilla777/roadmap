@@ -25,6 +25,9 @@ header nav a:hover{color:var(--text)}
 .phase-header h3{font-size:.95rem;font-weight:600;flex:1}
 .phase-header .phase-actions{display:flex;gap:.25rem}
 .backlog-header{color:var(--text2);font-style:italic}
+.phase-desc{font-size:.8rem;color:var(--text2);margin-bottom:.75rem;white-space:pre-wrap;word-break:break-word}
+.phase-desc-edit{width:100%;background:var(--surface2);border:1px solid var(--accent);color:var(--text);padding:.3rem .4rem;border-radius:3px;font-size:.8rem;font-family:inherit;resize:vertical;margin-bottom:.75rem;min-height:3rem}
+.project-desc{font-size:.875rem;color:var(--text2);margin-bottom:1rem;white-space:pre-wrap;word-break:break-word;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem}
 
 /* Tasks */
 .task-list{min-height:2rem}
@@ -32,8 +35,11 @@ header nav a:hover{color:var(--text)}
 .task:hover{background:var(--border)}
 .task .drag-handle{cursor:grab;color:var(--text2);font-size:.75rem;padding:0 .25rem}
 .task .task-id{color:var(--text2);font-size:.8rem;min-width:2.5rem}
-.task .task-title{flex:1}
+.task-body{flex:1;min-width:0}
+.task .task-title{display:block}
 .task .task-title input{background:transparent;border:1px solid var(--accent);color:var(--text);padding:.15rem .35rem;border-radius:3px;width:100%;font-size:.875rem}
+.task-desc{font-size:.8rem;color:var(--text2);margin-top:.2rem;white-space:pre-wrap;word-break:break-word}
+.task-desc-edit{width:100%;background:var(--surface);border:1px solid var(--accent);color:var(--text);padding:.3rem .4rem;border-radius:3px;font-size:.8rem;font-family:inherit;resize:vertical;margin-top:.3rem;min-height:3rem}
 .task .task-status{font-size:.75rem;padding:.1rem .4rem;border-radius:3px;cursor:pointer;border:none;color:#fff}
 .status-pending{background:#555}
 .status-active{background:var(--blue)}

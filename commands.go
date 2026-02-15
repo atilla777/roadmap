@@ -40,7 +40,7 @@ func cmdProjectAdd(db *sql.DB, args []string) {
 }
 
 func cmdProjectList(db *sql.DB) {
-	rows, err := db.Query(`SELECT id, name, path, created_at FROM projects ORDER BY name`)
+	rows, err := db.Query(`SELECT id, name, path, description, created_at FROM projects ORDER BY name`)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -64,6 +64,50 @@ func cmdProjectList(db *sql.DB) {
 	}
 }
 
+func cmdProjectEdit(db *sql.DB, args []string) {
+	fs := flag.NewFlagSet("project edit", flag.ExitOnError)
+	name := fs.String("name", "", "new project name")
+	desc := fs.String("desc", "", "project description (markdown)")
+	fs.Parse(reorderArgs(args))
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, `usage: roadmap project edit "name" [--name "..."] [--desc "..."]`)
+		os.Exit(1)
+	}
+	current := fs.Arg(0)
+
+	row := db.QueryRow(`SELECT id, name, path, description, created_at FROM projects WHERE name = ?`, current)
+	p, err := scanProject(row)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "project %q not found\n", current)
+		os.Exit(1)
+	}
+
+	nameSet := false
+	descSet := false
+	for _, a := range args {
+		if a == "--name" {
+			nameSet = true
+		}
+		if a == "--desc" {
+			descSet = true
+		}
+	}
+
+	if !nameSet && !descSet {
+		fmt.Fprintln(os.Stderr, "specify --name or --desc")
+		os.Exit(1)
+	}
+
+	if nameSet {
+		mustExec(db, `UPDATE projects SET name = ? WHERE id = ?`, *name, p.ID)
+	}
+	if descSet {
+		mustExec(db, `UPDATE projects SET description = ? WHERE id = ?`, *desc, p.ID)
+	}
+	fmt.Printf("project %q updated\n", current)
+}
+
 func cmdProjectRemove(db *sql.DB, args []string) {
 	if len(args) < 1 {
 		fmt.Fprintln(os.Stderr, `usage: roadmap project remove "name"`)
@@ -71,7 +115,7 @@ func cmdProjectRemove(db *sql.DB, args []string) {
 	}
 	name := args[0]
 
-	row := db.QueryRow(`SELECT id, name, path, created_at FROM projects WHERE name = ?`, name)
+	row := db.QueryRow(`SELECT id, name, path, description, created_at FROM projects WHERE name = ?`, name)
 	p, err := scanProject(row)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "project %q not found\n", name)
@@ -87,11 +131,15 @@ func cmdProjectRemove(db *sql.DB, args []string) {
 // --- Phase commands ---
 
 func cmdPhaseAdd(db *sql.DB, projectID int, args []string) {
-	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, `usage: roadmap phase add "title"`)
+	fs := flag.NewFlagSet("phase add", flag.ExitOnError)
+	desc := fs.String("desc", "", "description (markdown)")
+	fs.Parse(reorderArgs(args))
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, `usage: roadmap phase add "title" [--desc "..."]`)
 		os.Exit(1)
 	}
-	title := args[0]
+	title := fs.Arg(0)
 
 	// Get max sort_order for this project
 	var maxOrder int
@@ -102,8 +150,8 @@ func cmdPhaseAdd(db *sql.DB, projectID int, args []string) {
 	}
 
 	res, err := db.Exec(
-		`INSERT INTO phases (project_id, title, sort_order) VALUES (?, ?, ?)`,
-		projectID, title, maxOrder+1,
+		`INSERT INTO phases (project_id, title, description, sort_order) VALUES (?, ?, ?, ?)`,
+		projectID, title, *desc, maxOrder+1,
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -115,7 +163,7 @@ func cmdPhaseAdd(db *sql.DB, projectID int, args []string) {
 
 func cmdPhaseList(db *sql.DB, projectID int) {
 	rows, err := db.Query(
-		`SELECT id, project_id, title, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
+		`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 		projectID,
 	)
 	if err != nil {
@@ -138,6 +186,51 @@ func cmdPhaseList(db *sql.DB, projectID int) {
 		db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE phase_id = ?`, p.ID).Scan(&count)
 		fmt.Printf("#%-3d %s  (%d tasks)\n", p.ID, p.Title, count)
 	}
+}
+
+func cmdPhaseEdit(db *sql.DB, projectID int, args []string) {
+	fs := flag.NewFlagSet("phase edit", flag.ExitOnError)
+	title := fs.String("title", "", "new title")
+	desc := fs.String("desc", "", "description (markdown)")
+	fs.Parse(reorderArgs(args))
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, `usage: roadmap phase edit <id> [--title "..."] [--desc "..."]`)
+		os.Exit(1)
+	}
+	id := mustParseID(fs.Arg(0))
+
+	// Verify phase belongs to project
+	var exists int
+	err := db.QueryRow(`SELECT COUNT(*) FROM phases WHERE id = ? AND project_id = ?`, id, projectID).Scan(&exists)
+	if err != nil || exists == 0 {
+		fmt.Fprintf(os.Stderr, "phase #%d not found\n", id)
+		os.Exit(1)
+	}
+
+	titleSet := false
+	descSet := false
+	for _, a := range args {
+		if a == "--title" {
+			titleSet = true
+		}
+		if a == "--desc" {
+			descSet = true
+		}
+	}
+
+	if !titleSet && !descSet {
+		fmt.Fprintln(os.Stderr, "specify --title or --desc")
+		os.Exit(1)
+	}
+
+	if titleSet {
+		mustExec(db, `UPDATE phases SET title = ? WHERE id = ?`, *title, id)
+	}
+	if descSet {
+		mustExec(db, `UPDATE phases SET description = ? WHERE id = ?`, *desc, id)
+	}
+	fmt.Printf("phase #%d updated\n", id)
 }
 
 func cmdPhaseRemove(db *sql.DB, projectID int, args []string) {
@@ -171,7 +264,7 @@ func cmdPhaseMove(db *sql.DB, projectID int, args []string) {
 
 	// Get all phases for the project ordered by sort_order
 	rows, err := db.Query(
-		`SELECT id, project_id, title, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
+		`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 		projectID,
 	)
 	if err != nil {
@@ -226,10 +319,11 @@ func cmdPhaseMove(db *sql.DB, projectID int, args []string) {
 func cmdAdd(db *sql.DB, projectID int, args []string) {
 	fs := flag.NewFlagSet("add", flag.ExitOnError)
 	phase := fs.String("phase", "", "phase (ID or title)")
+	desc := fs.String("desc", "", "description (markdown)")
 	fs.Parse(reorderArgs(args))
 
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, `usage: roadmap add "title" [--phase "Phase"]`)
+		fmt.Fprintln(os.Stderr, `usage: roadmap add "title" [--phase "Phase"] [--desc "..."]`)
 		os.Exit(1)
 	}
 	title := fs.Arg(0)
@@ -248,8 +342,8 @@ func cmdAdd(db *sql.DB, projectID int, args []string) {
 	}
 
 	res, err := db.Exec(
-		`INSERT INTO tasks (project_id, title, phase_id, sort_order) VALUES (?, ?, ?, ?)`,
-		projectID, title, phaseID, maxOrder+1,
+		`INSERT INTO tasks (project_id, title, description, phase_id, sort_order) VALUES (?, ?, ?, ?, ?)`,
+		projectID, title, *desc, phaseID, maxOrder+1,
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -331,6 +425,9 @@ func cmdCurrent(db *sql.DB, projectID int) {
 			phase = fmt.Sprintf(" [%s]", t.PhaseTitle)
 		}
 		fmt.Printf("#%d %s%s\n", t.ID, t.Title, phase)
+		if t.Description != "" {
+			fmt.Print(indentDesc(t.Description, "   "))
+		}
 	}
 }
 
@@ -359,13 +456,16 @@ func cmdNext(db *sql.DB, projectID int) {
 			phase = fmt.Sprintf(" [%s]", t.PhaseTitle)
 		}
 		fmt.Printf("#%d %s%s\n", t.ID, t.Title, phase)
+		if t.Description != "" {
+			fmt.Print(indentDesc(t.Description, "   "))
+		}
 	}
 }
 
 func cmdList(db *sql.DB, projectID int) {
 	// Get phases in order
 	phaseRows, err := db.Query(
-		`SELECT id, project_id, title, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
+		`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 		projectID,
 	)
 	if err != nil {
@@ -456,29 +556,36 @@ func cmdEdit(db *sql.DB, projectID int, args []string) {
 	fs := flag.NewFlagSet("edit", flag.ExitOnError)
 	title := fs.String("title", "", "new title")
 	phase := fs.String("phase", "", "phase (ID, title, or empty to clear)")
+	desc := fs.String("desc", "", "description (markdown)")
 	fs.Parse(reorderArgs(args))
 
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, `usage: roadmap edit <id> [--title "..."] [--phase "..."]`)
+		fmt.Fprintln(os.Stderr, `usage: roadmap edit <id> [--title "..."] [--phase "..."] [--desc "..."]`)
 		os.Exit(1)
 	}
 	id := mustParseID(fs.Arg(0))
 
 	phaseSet := false
+	descSet := false
 	for _, a := range args {
 		if a == "--phase" {
 			phaseSet = true
-			break
+		}
+		if a == "--desc" {
+			descSet = true
 		}
 	}
 
-	if *title == "" && !phaseSet {
-		fmt.Fprintln(os.Stderr, "specify --title or --phase")
+	if *title == "" && !phaseSet && !descSet {
+		fmt.Fprintln(os.Stderr, "specify --title, --phase, or --desc")
 		os.Exit(1)
 	}
 
 	if *title != "" {
 		mustExec(db, `UPDATE tasks SET title = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ? AND project_id = ?`, *title, id, projectID)
+	}
+	if descSet {
+		mustExec(db, `UPDATE tasks SET description = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ? AND project_id = ?`, *desc, id, projectID)
 	}
 	if phaseSet {
 		if *phase == "" {

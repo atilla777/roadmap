@@ -33,7 +33,7 @@ func OpenDB() (*sql.DB, error) {
 	return db, nil
 }
 
-const currentSchemaVersion = 2
+const currentSchemaVersion = 3
 
 func Migrate(db *sql.DB) error {
 	// Ensure schema_version table exists
@@ -57,6 +57,11 @@ func Migrate(db *sql.DB) error {
 	}
 	if version < 2 {
 		if err := migrateV2(db); err != nil {
+			return err
+		}
+	}
+	if version < 3 {
+		if err := migrateV3(db); err != nil {
 			return err
 		}
 	}
@@ -228,6 +233,21 @@ CREATE INDEX IF NOT EXISTS idx_phases_project ON phases(project_id);
 	}
 
 	return tx.Commit()
+}
+
+// migrateV3 adds description (markdown) to tasks, projects, and phases.
+func migrateV3(db *sql.DB) error {
+	stmts := []string{
+		`ALTER TABLE tasks ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE projects ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE phases ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("migrate v3: %w", err)
+		}
+	}
+	return nil
 }
 
 func mustDB() *sql.DB {

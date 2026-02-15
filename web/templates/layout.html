@@ -59,6 +59,88 @@ function initSortables() {
     });
 }
 document.addEventListener('DOMContentLoaded', initSortables);
+
+function togglePhaseDesc(btn) {
+    var phase = btn.closest('.phase');
+    var phaseId = phase.dataset.phaseId;
+    var existing = phase.querySelector('.phase-desc-edit');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    var descEl = phase.querySelector('.phase-desc');
+    var current = descEl ? descEl.textContent : '';
+    var textarea = document.createElement('textarea');
+    textarea.className = 'phase-desc-edit';
+    textarea.value = current;
+    textarea.placeholder = 'Phase description...';
+    textarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { textarea.remove(); return; }
+        if (e.key === 'Enter' && e.ctrlKey) {
+            htmx.ajax('PUT', '/phases/' + phaseId, {
+                target: phase, swap: 'outerHTML',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                values: {description: textarea.value}
+            });
+        }
+    });
+    textarea.addEventListener('blur', function() {
+        var orig = descEl ? descEl.textContent : '';
+        if (textarea.value !== orig) {
+            htmx.ajax('PUT', '/phases/' + phaseId, {
+                target: phase, swap: 'outerHTML',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                values: {description: textarea.value}
+            });
+        } else {
+            textarea.remove();
+        }
+    });
+    var header = phase.querySelector('.phase-header');
+    header.insertAdjacentElement('afterend', textarea);
+    textarea.focus();
+}
+
+function toggleDesc(btn) {
+    var task = btn.closest('.task');
+    var taskId = task.dataset.taskId;
+    var existing = task.querySelector('.task-desc-edit');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    var body = task.querySelector('.task-body');
+    var descEl = body.querySelector('.task-desc');
+    var current = descEl ? descEl.textContent : '';
+    var textarea = document.createElement('textarea');
+    textarea.className = 'task-desc-edit';
+    textarea.value = current;
+    textarea.placeholder = 'Description (markdown)...';
+    textarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { textarea.remove(); return; }
+        if (e.key === 'Enter' && e.ctrlKey) {
+            htmx.ajax('PUT', '/tasks/' + taskId, {
+                target: task, swap: 'outerHTML',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                values: {description: textarea.value}
+            });
+        }
+    });
+    textarea.addEventListener('blur', function() {
+        var orig = descEl ? descEl.textContent : '';
+        if (textarea.value !== orig) {
+            htmx.ajax('PUT', '/tasks/' + taskId, {
+                target: task, swap: 'outerHTML',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                values: {description: textarea.value}
+            });
+        } else {
+            textarea.remove();
+        }
+    });
+    body.appendChild(textarea);
+    textarea.focus();
+}
 </script>
 </body>
 </html>{{end}}

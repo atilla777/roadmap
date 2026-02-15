@@ -4,9 +4,11 @@
         <span class="phase-drag-handle drag-handle">⠿</span>
         <h3>{{.Phase.Title}}</h3>
         <div class="phase-actions">
+            <button class="btn btn-sm" onclick="togglePhaseDesc(this)" title="Description">☰</button>
             <button class="btn btn-sm btn-danger" hx-delete="/phases/{{.Phase.ID}}" hx-target="closest .phase" hx-swap="outerHTML" hx-confirm="Delete phase? Tasks will move to backlog.">✕</button>
         </div>
     </div>
+    {{if .Phase.Description}}<div class="phase-desc">{{.Phase.Description}}</div>{{end}}
     <div class="task-list" data-phase-id="{{.Phase.ID}}">
     {{range .Tasks}}
     {{template "task" .}}

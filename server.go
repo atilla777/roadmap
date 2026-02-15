@@ -77,6 +77,7 @@ func cmdServe(db *sql.DB, args []string) {
 
 	// Phase API
 	mux.HandleFunc("POST /projects/{id}/phases", handlePhaseCreate(db, tmpl))
+	mux.HandleFunc("PUT /phases/{id}", handlePhaseUpdate(db, tmpl))
 	mux.HandleFunc("DELETE /phases/{id}", handlePhaseDelete(db))
 	mux.HandleFunc("PUT /phases/{id}/order", handlePhaseOrder(db))
 
@@ -99,7 +100,7 @@ func cmdServe(db *sql.DB, args []string) {
 
 func handleProjects(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query(`SELECT id, name, path, created_at FROM projects ORDER BY name`)
+		rows, err := db.Query(`SELECT id, name, path, description, created_at FROM projects ORDER BY name`)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -120,7 +121,7 @@ func handleProject(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 			return
 		}
 
-		row := db.QueryRow(`SELECT id, name, path, created_at FROM projects WHERE id = ?`, projectID)
+		row := db.QueryRow(`SELECT id, name, path, description, created_at FROM projects WHERE id = ?`, projectID)
 		proj, err := scanProject(row)
 		if err != nil {
 			http.Error(w, "project not found", 404)
@@ -129,7 +130,7 @@ func handleProject(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 		// Get phases
 		phaseRows, err := db.Query(
-			`SELECT id, project_id, title, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
+			`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 			projectID,
 		)
 		if err != nil {
@@ -171,9 +172,10 @@ func handleProject(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 		}
 
 		data := map[string]any{
-			"ProjectID": proj.ID,
-			"Phases":    phaseList,
-			"Backlog":   backlog,
+			"ProjectID":   proj.ID,
+			"ProjectDesc": proj.Description,
+			"Phases":      phaseList,
+			"Backlog":     backlog,
 		}
 		renderPage(w, tmpl, "project-content", data, pageData{
 			Title: proj.Name, ProjectID: proj.ID, ProjectName: proj.Name,
@@ -214,6 +216,48 @@ func handlePhaseCreate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	}
 }
 
+func handlePhaseUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, _ := strconv.Atoi(r.PathValue("id"))
+		r.ParseForm()
+
+		title := r.FormValue("title")
+		desc := r.FormValue("description")
+		descSet := r.Form.Has("description")
+
+		if title != "" {
+			db.Exec(`UPDATE phases SET title = ? WHERE id = ?`, title, id)
+		}
+		if descSet {
+			db.Exec(`UPDATE phases SET description = ? WHERE id = ?`, desc, id)
+		}
+
+		// Return updated phase fragment
+		row := db.QueryRow(`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE id = ?`, id)
+		phase, err := scanPhase(row)
+		if err != nil {
+			http.Error(w, "phase not found", 404)
+			return
+		}
+
+		taskRows, err := db.Query(
+			`SELECT `+taskSelectCols+` `+taskFromJoin+` WHERE t.phase_id = ? ORDER BY t.sort_order, t.id`, id,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		tasks, _ := scanTasks(taskRows)
+		taskRows.Close()
+
+		data := struct {
+			Phase Phase
+			Tasks []Task
+		}{Phase: phase, Tasks: tasks}
+		tmpl.ExecuteTemplate(w, "phase", data)
+	}
+}
+
 func handlePhaseDelete(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
@@ -237,7 +281,7 @@ func handlePhaseOrder(db *sql.DB) http.HandlerFunc {
 		}
 
 		rows, err := db.Query(
-			`SELECT id, project_id, title, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
+			`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 			projectID,
 		)
 		if err != nil {
@@ -348,14 +392,20 @@ func handleTaskUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 
+		r.ParseForm()
 		status := r.FormValue("status")
 		title := r.FormValue("title")
+		desc := r.FormValue("description")
+		descSet := r.Form.Has("description")
 
 		if status != "" {
 			db.Exec(`UPDATE tasks SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, status, id)
 		}
 		if title != "" {
 			db.Exec(`UPDATE tasks SET title = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, title, id)
+		}
+		if descSet {
+			db.Exec(`UPDATE tasks SET description = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, desc, id)
 		}
 
 		// Return updated task fragment

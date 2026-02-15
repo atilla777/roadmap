@@ -1,4 +1,5 @@
 {{define "project-content"}}
+{{if .ProjectDesc}}<div class="project-desc">{{.ProjectDesc}}</div>{{end}}
 <form class="phase-form" hx-post="/projects/{{.ProjectID}}/phases" hx-target=".phase-container" hx-swap="beforeend" hx-on::after-request="this.reset()">
     <input type="text" name="title" placeholder="New phase..." required>
     <button class="btn btn-accent" type="submit">Add phase</button>
