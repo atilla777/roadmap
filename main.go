@@ -33,14 +33,16 @@ phase commands:
   phase move <id> <position>        reorder a phase
 
 task commands:
-  add "title" [--phase "P"] [--desc "..."]  add a pending task
+  add "title" [--phase "P"] [--desc "..."] [--priority low/medium/high] [--due YYYY-MM-DD]
+                              add a pending task
   start <id>                  mark task as active
   done [id]                   mark task as done (default: single active)
   current                     show active tasks
   next                        show next 5 pending tasks
-  list                        all tasks grouped by phase
+  list [--status pending/active/done] [--phase "P"] [--search "query"]
+                              all tasks grouped by phase (with optional filters)
   context                     compact LLM summary
-  edit <id> --title/--phase/--desc  edit a task
+  edit <id> --title/--phase/--desc/--priority/--due  edit a task
   move <id> <position>        reorder a task within its phase
   remove <id>                 delete a task
 
@@ -148,7 +150,7 @@ func main() {
 	case "next":
 		err = cmdNext(db, proj.ID)
 	case "list":
-		err = cmdList(db, proj.ID)
+		err = cmdList(db, proj.ID, rest)
 	case "context":
 		err = cmdContext(db, proj.ID, proj.Name)
 	case "edit":

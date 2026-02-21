@@ -130,6 +130,61 @@ func TestFormatContext(t *testing.T) {
 	}
 }
 
+func TestPriorityLabel(t *testing.T) {
+	tests := []struct {
+		in   int
+		want string
+	}{
+		{0, ""},
+		{1, "low"},
+		{2, "med"},
+		{3, "high"},
+		{99, ""},
+		{-1, ""},
+	}
+	for _, tt := range tests {
+		got := priorityLabel(tt.in)
+		if got != tt.want {
+			t.Errorf("priorityLabel(%d) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestTaskExtra(t *testing.T) {
+	tests := []struct {
+		name string
+		task Task
+		want string
+	}{
+		{"no extra", Task{}, ""},
+		{"priority only", Task{Priority: 3}, "  !high"},
+		{"due only", Task{DueDate: "2025-03-01"}, "  due:2025-03-01"},
+		{"both", Task{Priority: 1, DueDate: "2025-03-01"}, "  !low due:2025-03-01"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := taskExtra(tt.task)
+			if got != tt.want {
+				t.Errorf("taskExtra() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatList_WithPriorityAndDue(t *testing.T) {
+	tasks := []Task{
+		{ID: 1, Title: "urgent task", Status: "pending", Priority: 3, DueDate: "2025-03-01"},
+		{ID: 2, Title: "normal task", Status: "pending"},
+	}
+	got := FormatList(nil, tasks)
+	if !strings.Contains(got, "!high") {
+		t.Error("expected !high in output")
+	}
+	if !strings.Contains(got, "due:2025-03-01") {
+		t.Error("expected due date in output")
+	}
+}
+
 func TestFormatContext_Empty(t *testing.T) {
 	got := FormatContext("proj", nil, nil, nil)
 	if !strings.Contains(got, "[roadmap: proj]") {

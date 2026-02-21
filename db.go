@@ -33,7 +33,7 @@ func OpenDB() (*sql.DB, error) {
 	return db, nil
 }
 
-const currentSchemaVersion = 3
+const currentSchemaVersion = 4
 
 func Migrate(db *sql.DB) error {
 	// Ensure schema_version table exists
@@ -62,6 +62,11 @@ func Migrate(db *sql.DB) error {
 	}
 	if version < 3 {
 		if err := migrateV3(db); err != nil {
+			return err
+		}
+	}
+	if version < 4 {
+		if err := migrateV4(db); err != nil {
 			return err
 		}
 	}
@@ -245,6 +250,20 @@ func migrateV3(db *sql.DB) error {
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
 			return fmt.Errorf("migrate v3: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV4 adds priority and due_date to tasks.
+func migrateV4(db *sql.DB) error {
+	stmts := []string{
+		`ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE tasks ADD COLUMN due_date TEXT NOT NULL DEFAULT ''`,
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("migrate v4: %w", err)
 		}
 	}
 	return nil

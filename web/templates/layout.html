@@ -141,6 +141,37 @@ function toggleDesc(btn) {
     body.appendChild(textarea);
     textarea.focus();
 }
+
+function filterTasks() {
+    var search = (document.getElementById('filter-search') || {}).value || '';
+    var status = (document.getElementById('filter-status') || {}).value || '';
+    search = search.toLowerCase();
+    document.querySelectorAll('.task').forEach(function(el) {
+        var show = true;
+        if (status && el.dataset.status !== status) show = false;
+        if (search) {
+            var text = (el.querySelector('.task-title') || {}).textContent || '';
+            var desc = (el.querySelector('.task-desc') || {}).textContent || '';
+            if (text.toLowerCase().indexOf(search) === -1 && desc.toLowerCase().indexOf(search) === -1) show = false;
+        }
+        el.style.display = show ? '' : 'none';
+    });
+}
+
+function markOverdueDates() {
+    var today = new Date().toISOString().slice(0, 10);
+    document.querySelectorAll('.due-date').forEach(function(el) {
+        var due = el.dataset.due;
+        if (due && due < today) {
+            el.classList.add('overdue');
+        } else {
+            el.classList.remove('overdue');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', markOverdueDates);
+document.body.addEventListener('htmx:afterSettle', markOverdueDates);
 </script>
 </body>
 </html>{{end}}

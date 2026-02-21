@@ -28,6 +28,9 @@ var funcMap = template.FuncMap{
 			return "pending"
 		}
 	},
+	"priorityLabel": func(p int) string {
+		return priorityLabel(p)
+	},
 }
 
 func loadTemplates() *template.Template {
@@ -397,9 +400,20 @@ func handleTaskCreateInPhase(db *sql.DB, tmpl *template.Template) http.HandlerFu
 			return
 		}
 
+		priority, err := validatePriority(r.FormValue("priority"))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		dueDate := r.FormValue("due_date")
+		if err := validateDueDate(dueDate); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
 		// Get project_id from phase
 		var projectID int
-		err := db.QueryRow(`SELECT project_id FROM phases WHERE id = ?`, phaseID).Scan(&projectID)
+		err = db.QueryRow(`SELECT project_id FROM phases WHERE id = ?`, phaseID).Scan(&projectID)
 		if err != nil {
 			http.Error(w, "phase not found", 404)
 			return
@@ -409,8 +423,8 @@ func handleTaskCreateInPhase(db *sql.DB, tmpl *template.Template) http.HandlerFu
 		db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM tasks WHERE phase_id = ?`, phaseID).Scan(&maxOrder)
 
 		res, err := db.Exec(
-			`INSERT INTO tasks (project_id, title, phase_id, sort_order) VALUES (?, ?, ?, ?)`,
-			projectID, title, phaseID, maxOrder+1,
+			`INSERT INTO tasks (project_id, title, phase_id, sort_order, priority, due_date) VALUES (?, ?, ?, ?, ?, ?)`,
+			projectID, title, phaseID, maxOrder+1, priority, dueDate,
 		)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -418,7 +432,7 @@ func handleTaskCreateInPhase(db *sql.DB, tmpl *template.Template) http.HandlerFu
 		}
 		id, _ := res.LastInsertId()
 
-		task := Task{ID: int(id), ProjectID: projectID, Title: title, Status: "pending", PhaseID: sql.NullInt64{Int64: int64(phaseID), Valid: true}, SortOrder: maxOrder + 1}
+		task := Task{ID: int(id), ProjectID: projectID, Title: title, Status: "pending", PhaseID: sql.NullInt64{Int64: int64(phaseID), Valid: true}, SortOrder: maxOrder + 1, Priority: priority, DueDate: dueDate}
 		tmpl.ExecuteTemplate(w, "task", task)
 	}
 }
@@ -434,6 +448,17 @@ func handleTaskCreateBacklog(db *sql.DB, tmpl *template.Template) http.HandlerFu
 			return
 		}
 
+		priority, err := validatePriority(r.FormValue("priority"))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		dueDate := r.FormValue("due_date")
+		if err := validateDueDate(dueDate); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
 		// Verify project exists
 		var exists int
 		if err := db.QueryRow(`SELECT COUNT(*) FROM projects WHERE id = ?`, projectID).Scan(&exists); err != nil || exists == 0 {
@@ -445,8 +470,8 @@ func handleTaskCreateBacklog(db *sql.DB, tmpl *template.Template) http.HandlerFu
 		db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM tasks WHERE project_id = ? AND phase_id IS NULL`, projectID).Scan(&maxOrder)
 
 		res, err := db.Exec(
-			`INSERT INTO tasks (project_id, title, sort_order) VALUES (?, ?, ?)`,
-			projectID, title, maxOrder+1,
+			`INSERT INTO tasks (project_id, title, sort_order, priority, due_date) VALUES (?, ?, ?, ?, ?)`,
+			projectID, title, maxOrder+1, priority, dueDate,
 		)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -454,7 +479,7 @@ func handleTaskCreateBacklog(db *sql.DB, tmpl *template.Template) http.HandlerFu
 		}
 		id, _ := res.LastInsertId()
 
-		task := Task{ID: int(id), ProjectID: projectID, Title: title, Status: "pending", SortOrder: maxOrder + 1}
+		task := Task{ID: int(id), ProjectID: projectID, Title: title, Status: "pending", SortOrder: maxOrder + 1, Priority: priority, DueDate: dueDate}
 		tmpl.ExecuteTemplate(w, "task", task)
 	}
 }
@@ -471,6 +496,10 @@ func handleTaskUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 		title := r.FormValue("title")
 		desc := r.FormValue("description")
 		descSet := r.Form.Has("description")
+		priorityStr := r.FormValue("priority")
+		prioritySet := r.Form.Has("priority")
+		dueStr := r.FormValue("due_date")
+		dueSet := r.Form.Has("due_date")
 
 		if title != "" && len(title) > maxTitleLen {
 			http.Error(w, fmt.Sprintf("title too long (max %d characters)", maxTitleLen), 400)
@@ -488,6 +517,21 @@ func handleTaskUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 		}
 		if descSet {
 			db.Exec(`UPDATE tasks SET description = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, desc, id)
+		}
+		if prioritySet {
+			p, err := validatePriority(priorityStr)
+			if err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			db.Exec(`UPDATE tasks SET priority = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, p, id)
+		}
+		if dueSet {
+			if err := validateDueDate(dueStr); err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			db.Exec(`UPDATE tasks SET due_date = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, dueStr, id)
 		}
 
 		// Return updated task fragment

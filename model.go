@@ -27,6 +27,8 @@ type Task struct {
 	Status      string
 	PhaseID     sql.NullInt64
 	SortOrder   int
+	Priority    int
+	DueDate     string
 	CreatedAt   string
 	UpdatedAt   string
 	// Joined field, not stored directly
@@ -72,7 +74,7 @@ func scanPhases(rows *sql.Rows) ([]Phase, error) {
 func scanTask(row *sql.Row) (Task, error) {
 	var t Task
 	var phaseTitle sql.NullString
-	err := row.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.PhaseID, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt, &phaseTitle)
+	err := row.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.PhaseID, &t.SortOrder, &t.Priority, &t.DueDate, &t.CreatedAt, &t.UpdatedAt, &phaseTitle)
 	if phaseTitle.Valid {
 		t.PhaseTitle = phaseTitle.String
 	}
@@ -84,7 +86,7 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 	for rows.Next() {
 		var t Task
 		var phaseTitle sql.NullString
-		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.PhaseID, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt, &phaseTitle); err != nil {
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.PhaseID, &t.SortOrder, &t.Priority, &t.DueDate, &t.CreatedAt, &t.UpdatedAt, &phaseTitle); err != nil {
 			return nil, err
 		}
 		if phaseTitle.Valid {
@@ -96,5 +98,5 @@ func scanTasks(rows *sql.Rows) ([]Task, error) {
 }
 
 // taskSelectCols is the standard SELECT for tasks with a LEFT JOIN on phases.
-const taskSelectCols = `t.id, t.project_id, t.title, t.description, t.status, t.phase_id, t.sort_order, t.created_at, t.updated_at, p.title`
+const taskSelectCols = `t.id, t.project_id, t.title, t.description, t.status, t.phase_id, t.sort_order, t.priority, t.due_date, t.created_at, t.updated_at, p.title`
 const taskFromJoin = `FROM tasks t LEFT JOIN phases p ON p.id = t.phase_id`

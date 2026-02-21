@@ -3,6 +3,7 @@
   --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#252525;--border:#333;
   --text:#e0e0e0;--text2:#888;--accent:#6c9;--accent2:#4a7;
   --red:#e55;--yellow:#ec3;--blue:#5af;
+  --orange:#e93;
 }
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
@@ -29,6 +30,13 @@ header nav a:hover{color:var(--text)}
 .phase-desc-edit{width:100%;background:var(--surface2);border:1px solid var(--accent);color:var(--text);padding:.3rem .4rem;border-radius:3px;font-size:.8rem;font-family:inherit;resize:vertical;margin-bottom:.75rem;min-height:3rem}
 .project-desc{font-size:.875rem;color:var(--text2);margin-bottom:1rem;white-space:pre-wrap;word-break:break-word;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem}
 
+/* Filter bar */
+.filter-bar{display:flex;gap:.5rem;margin-bottom:1rem}
+.filter-bar input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.4rem .6rem;border-radius:4px;font-size:.875rem}
+.filter-bar input[type=text]:focus{outline:none;border-color:var(--accent)}
+.filter-bar input[type=text]::placeholder{color:var(--text2)}
+.filter-bar select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.4rem .5rem;border-radius:4px;font-size:.875rem}
+
 /* Tasks */
 .task-list{min-height:2rem}
 .task{display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:4px;background:var(--surface2);margin-bottom:.35rem;font-size:.875rem}
@@ -46,6 +54,16 @@ header nav a:hover{color:var(--text)}
 .status-done{background:var(--accent2)}
 .task .task-actions{display:flex;gap:.15rem}
 
+/* Priority badges */
+.priority-badge{font-size:.7rem;padding:.1rem .35rem;border-radius:3px;font-weight:600;text-transform:uppercase;white-space:nowrap}
+.priority-low{background:#3a5a3a;color:#8c8}
+.priority-med{background:#5a4a1a;color:var(--yellow)}
+.priority-high{background:#5a1a1a;color:var(--red)}
+
+/* Due dates */
+.due-date{font-size:.7rem;color:var(--text2);white-space:nowrap}
+.due-date.overdue{color:var(--red);font-weight:600}
+
 /* Buttons */
 .btn{display:inline-flex;align-items:center;gap:.25rem;padding:.3rem .6rem;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.8rem;cursor:pointer;transition:background .15s}
 .btn:hover{background:var(--border)}
@@ -56,10 +74,13 @@ header nav a:hover{color:var(--text)}
 .btn-danger:hover{background:var(--red);color:#fff}
 
 /* Forms */
-.add-form{display:flex;gap:.5rem;margin-top:.5rem}
+.add-form{display:flex;gap:.5rem;margin-top:.5rem;align-items:center}
 .add-form input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.35rem .5rem;border-radius:4px;font-size:.875rem}
 .add-form input[type=text]:focus{outline:none;border-color:var(--accent)}
 .add-form input[type=text]::placeholder{color:var(--text2)}
+.add-priority{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.25rem .3rem;border-radius:4px;font-size:.75rem;width:4.5rem}
+.add-due{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.25rem .3rem;border-radius:4px;font-size:.75rem;width:8.5rem}
+.add-due::-webkit-calendar-picker-indicator{filter:invert(.7)}
 
 .phase-form{display:flex;gap:.5rem;margin-bottom:1rem}
 .phase-form input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.4rem .6rem;border-radius:4px;font-size:.875rem}

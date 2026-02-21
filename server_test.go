@@ -517,6 +517,108 @@ func TestWebValidation_TaskOrder_InvalidID(t *testing.T) {
 	}
 }
 
+func TestHandleTaskCreateInPhase_WithPriority(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+	phID := createPhase(t, db, pid, "Phase", 0)
+
+	resp, err := postForm(srv, "/phases/"+itoa(phID)+"/tasks", url.Values{
+		"title": {"High task"}, "priority": {"high"}, "due_date": {"2025-06-01"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("POST task with priority = %d, want 200", resp.StatusCode)
+	}
+
+	var priority int
+	var dueDate string
+	db.QueryRow(`SELECT priority, due_date FROM tasks WHERE title = 'High task'`).Scan(&priority, &dueDate)
+	if priority != 3 {
+		t.Errorf("priority = %d, want 3", priority)
+	}
+	if dueDate != "2025-06-01" {
+		t.Errorf("due_date = %q, want 2025-06-01", dueDate)
+	}
+}
+
+func TestHandleTaskCreateBacklog_WithPriority(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+
+	resp, _ := postForm(srv, "/projects/"+itoa(pid)+"/tasks", url.Values{
+		"title": {"Low task"}, "priority": {"low"}, "due_date": {"2025-07-01"},
+	})
+	if resp.StatusCode != 200 {
+		t.Errorf("POST backlog with priority = %d, want 200", resp.StatusCode)
+	}
+
+	var priority int
+	var dueDate string
+	db.QueryRow(`SELECT priority, due_date FROM tasks WHERE title = 'Low task'`).Scan(&priority, &dueDate)
+	if priority != 1 {
+		t.Errorf("priority = %d, want 1", priority)
+	}
+	if dueDate != "2025-07-01" {
+		t.Errorf("due_date = %q", dueDate)
+	}
+}
+
+func TestHandleTaskUpdate_PriorityAndDue(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+	taskID := createTask(t, db, pid, "task1", "pending", nil)
+
+	resp, _ := putForm(srv, "/tasks/"+itoa(taskID), url.Values{"priority": {"medium"}, "due_date": {"2025-08-01"}})
+	if resp.StatusCode != 200 {
+		t.Errorf("PUT task priority/due = %d, want 200", resp.StatusCode)
+	}
+
+	var priority int
+	var dueDate string
+	db.QueryRow(`SELECT priority, due_date FROM tasks WHERE id = ?`, taskID).Scan(&priority, &dueDate)
+	if priority != 2 {
+		t.Errorf("priority = %d, want 2", priority)
+	}
+	if dueDate != "2025-08-01" {
+		t.Errorf("due_date = %q", dueDate)
+	}
+}
+
+func TestHandleTaskUpdate_InvalidPriority(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+	taskID := createTask(t, db, pid, "task1", "pending", nil)
+
+	resp, _ := putForm(srv, "/tasks/"+itoa(taskID), url.Values{"priority": {"urgent"}})
+	if resp.StatusCode != 400 {
+		t.Errorf("PUT task invalid priority = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestHandleTaskUpdate_InvalidDueDate(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+	taskID := createTask(t, db, pid, "task1", "pending", nil)
+
+	resp, _ := putForm(srv, "/tasks/"+itoa(taskID), url.Values{"due_date": {"not-a-date"}})
+	if resp.StatusCode != 400 {
+		t.Errorf("PUT task invalid due date = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestHandleTaskCreateInPhase_InvalidPriority(t *testing.T) {
+	db, srv := testServer(t)
+	pid := createProject(t, db, "proj", "/p")
+	phID := createPhase(t, db, pid, "Phase", 0)
+
+	resp, _ := postForm(srv, "/phases/"+itoa(phID)+"/tasks", url.Values{"title": {"task"}, "priority": {"urgent"}})
+	if resp.StatusCode != 400 {
+		t.Errorf("POST task invalid priority = %d, want 400", resp.StatusCode)
+	}
+}
+
 func TestWebValidation_TaskOrder_InvalidPosition(t *testing.T) {
 	db, srv := testServer(t)
 	pid := createProject(t, db, "proj", "/p")

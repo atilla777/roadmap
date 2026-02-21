@@ -1,11 +1,13 @@
 {{define "task"}}
-<div class="task" data-task-id="{{.ID}}">
+<div class="task" data-task-id="{{.ID}}" data-status="{{.Status}}">
     <span class="drag-handle">⠿</span>
     <span class="task-id">#{{.ID}}</span>
     <div class="task-body">
         <span class="task-title">{{.Title}}</span>
         {{if .Description}}<div class="task-desc">{{.Description}}</div>{{end}}
     </div>
+    {{$pl := priorityLabel .Priority}}{{if $pl}}<span class="priority-badge priority-{{$pl}}">{{$pl}}</span>{{end}}
+    {{if .DueDate}}<span class="due-date" data-due="{{.DueDate}}">{{.DueDate}}</span>{{end}}
     <button class="task-status status-{{.Status}}"
             hx-put="/tasks/{{.ID}}"
             hx-vals='{"status":"{{nextStatus .Status}}"}'

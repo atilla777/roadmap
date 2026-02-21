@@ -16,6 +16,13 @@
     </div>
     <form class="add-form" hx-post="/phases/{{.Phase.ID}}/tasks" hx-target="previous .task-list" hx-swap="beforeend" hx-on::after-request="this.reset()">
         <input type="text" name="title" placeholder="Add task..." required>
+        <select name="priority" class="add-priority">
+            <option value="">—</option>
+            <option value="low">Low</option>
+            <option value="medium">Med</option>
+            <option value="high">High</option>
+        </select>
+        <input type="date" name="due_date" class="add-due" title="Due date">
         <button class="btn btn-sm btn-accent" type="submit">+</button>
     </form>
 </div>

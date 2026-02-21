@@ -94,3 +94,59 @@ func TestResolvePhase_NotFound(t *testing.T) {
 		t.Error("expected error for nonexistent phase")
 	}
 }
+
+func TestValidatePriority(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    int
+		wantErr bool
+	}{
+		{"", 0, false},
+		{"none", 0, false},
+		{"0", 0, false},
+		{"low", 1, false},
+		{"1", 1, false},
+		{"medium", 2, false},
+		{"med", 2, false},
+		{"2", 2, false},
+		{"high", 3, false},
+		{"3", 3, false},
+		{"HIGH", 3, false},
+		{"Low", 1, false},
+		{"invalid", 0, true},
+		{"4", 0, true},
+		{"urgent", 0, true},
+	}
+	for _, tt := range tests {
+		got, err := validatePriority(tt.in)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validatePriority(%q) error = %v, wantErr %v", tt.in, err, tt.wantErr)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("validatePriority(%q) = %d, want %d", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestValidateDueDate(t *testing.T) {
+	tests := []struct {
+		in      string
+		wantErr bool
+	}{
+		{"", false},
+		{"2025-03-01", false},
+		{"2025-12-31", false},
+		{"2025-3-01", true},
+		{"20250301", true},
+		{"03-01-2025", true},
+		{"not-a-date", true},
+		{"2025/03/01", true},
+	}
+	for _, tt := range tests {
+		err := validateDueDate(tt.in)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validateDueDate(%q) error = %v, wantErr %v", tt.in, err, tt.wantErr)
+		}
+	}
+}

@@ -16,6 +16,34 @@ func statusIcon(status string) string {
 	}
 }
 
+func priorityLabel(p int) string {
+	switch p {
+	case 1:
+		return "low"
+	case 2:
+		return "med"
+	case 3:
+		return "high"
+	default:
+		return ""
+	}
+}
+
+// taskExtra returns a suffix string with priority and due date info.
+func taskExtra(t Task) string {
+	var parts []string
+	if l := priorityLabel(t.Priority); l != "" {
+		parts = append(parts, "!"+l)
+	}
+	if t.DueDate != "" {
+		parts = append(parts, "due:"+t.DueDate)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "  " + strings.Join(parts, " ")
+}
+
 // indentDesc formats a description with the given indent prefix.
 // Returns empty string if description is empty.
 func indentDesc(desc, indent string) string {
@@ -62,7 +90,8 @@ func FormatList(phases []Phase, tasks []Task) string {
 		b.WriteString("\n")
 		b.WriteString(indentDesc(phase.Description, "  "))
 		for _, t := range phaseTasks {
-			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
+			extra := taskExtra(t)
+			fmt.Fprintf(&b, "  %s #%-3d %s  %s%s\n", statusIcon(t.Status), t.ID, t.Title, t.Status, extra)
 			b.WriteString(indentDesc(t.Description, "         "))
 		}
 	}
@@ -74,7 +103,8 @@ func FormatList(phases []Phase, tasks []Task) string {
 		}
 		b.WriteString("(backlog)\n")
 		for _, t := range backlog {
-			fmt.Fprintf(&b, "  %s #%-3d %s  %s\n", statusIcon(t.Status), t.ID, t.Title, t.Status)
+			extra := taskExtra(t)
+			fmt.Fprintf(&b, "  %s #%-3d %s  %s%s\n", statusIcon(t.Status), t.ID, t.Title, t.Status, extra)
 			b.WriteString(indentDesc(t.Description, "         "))
 		}
 	}

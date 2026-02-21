@@ -530,7 +530,7 @@ func TestCmdList(t *testing.T) {
 	createTask(t, db, pid, "t1", "pending", intPtr(phID))
 	createTask(t, db, pid, "t2", "active", nil)
 
-	if err := cmdList(db, pid); err != nil {
+	if err := cmdList(db, pid, nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -538,7 +538,116 @@ func TestCmdList(t *testing.T) {
 func TestCmdList_Empty(t *testing.T) {
 	db := testDB(t)
 	pid := createProject(t, db, "proj", "/p")
-	if err := cmdList(db, pid); err != nil {
+	if err := cmdList(db, pid, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmdAdd_WithPriorityAndDue(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+
+	if err := cmdAdd(db, pid, []string{"Urgent task", "--priority", "high", "--due", "2025-03-01"}); err != nil {
+		t.Fatal(err)
+	}
+	var priority int
+	var dueDate string
+	db.QueryRow(`SELECT priority, due_date FROM tasks WHERE title = 'Urgent task'`).Scan(&priority, &dueDate)
+	if priority != 3 {
+		t.Errorf("priority = %d, want 3", priority)
+	}
+	if dueDate != "2025-03-01" {
+		t.Errorf("due_date = %q, want 2025-03-01", dueDate)
+	}
+}
+
+func TestCmdAdd_InvalidPriority(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+
+	err := cmdAdd(db, pid, []string{"task", "--priority", "urgent"})
+	if err == nil {
+		t.Error("expected error for invalid priority")
+	}
+}
+
+func TestCmdAdd_InvalidDueDate(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+
+	err := cmdAdd(db, pid, []string{"task", "--due", "not-a-date"})
+	if err == nil {
+		t.Error("expected error for invalid due date")
+	}
+}
+
+func TestCmdEdit_PriorityAndDue(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+	taskID := createTask(t, db, pid, "task1", "pending", nil)
+
+	// Set priority
+	if err := cmdEdit(db, pid, []string{itoa(taskID), "--priority", "medium"}); err != nil {
+		t.Fatal(err)
+	}
+	var priority int
+	db.QueryRow(`SELECT priority FROM tasks WHERE id = ?`, taskID).Scan(&priority)
+	if priority != 2 {
+		t.Errorf("priority = %d, want 2", priority)
+	}
+
+	// Set due date
+	if err := cmdEdit(db, pid, []string{itoa(taskID), "--due", "2025-04-01"}); err != nil {
+		t.Fatal(err)
+	}
+	var dueDate string
+	db.QueryRow(`SELECT due_date FROM tasks WHERE id = ?`, taskID).Scan(&dueDate)
+	if dueDate != "2025-04-01" {
+		t.Errorf("due_date = %q, want 2025-04-01", dueDate)
+	}
+
+	// Clear due date
+	if err := cmdEdit(db, pid, []string{itoa(taskID), "--due", ""}); err != nil {
+		t.Fatal(err)
+	}
+	db.QueryRow(`SELECT due_date FROM tasks WHERE id = ?`, taskID).Scan(&dueDate)
+	if dueDate != "" {
+		t.Errorf("due_date = %q, want empty", dueDate)
+	}
+}
+
+func TestCmdList_FilterByStatus(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+	createTask(t, db, pid, "pending1", "pending", nil)
+	createTask(t, db, pid, "active1", "active", nil)
+	createTask(t, db, pid, "done1", "done", nil)
+
+	// Filter pending only — should not error
+	if err := cmdList(db, pid, []string{"--status", "pending"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmdList_FilterBySearch(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+	createTask(t, db, pid, "find me", "pending", nil)
+	createTask(t, db, pid, "other task", "pending", nil)
+
+	if err := cmdList(db, pid, []string{"--search", "find"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmdList_FilterByPhase(t *testing.T) {
+	db := testDB(t)
+	pid := createProject(t, db, "proj", "/p")
+	phID := createPhase(t, db, pid, "Alpha", 0)
+	createTask(t, db, pid, "in phase", "pending", intPtr(phID))
+	createTask(t, db, pid, "no phase", "pending", nil)
+
+	if err := cmdList(db, pid, []string{"--phase", itoa(phID)}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -1,5 +1,16 @@
 {{define "project-content"}}
 {{if .ProjectDesc}}<div class="project-desc">{{.ProjectDesc}}</div>{{end}}
+
+<div class="filter-bar">
+    <input type="text" id="filter-search" placeholder="Search tasks..." oninput="filterTasks()">
+    <select id="filter-status" onchange="filterTasks()">
+        <option value="">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="active">Active</option>
+        <option value="done">Done</option>
+    </select>
+</div>
+
 <form class="phase-form" hx-post="/projects/{{.ProjectID}}/phases" hx-target=".phase-container" hx-swap="beforeend" hx-on::after-request="this.reset()">
     <input type="text" name="title" placeholder="New phase..." required>
     <button class="btn btn-accent" type="submit">Add phase</button>
@@ -23,6 +34,13 @@
     </div>
     <form class="add-form" hx-post="/projects/{{$.ProjectID}}/tasks" hx-target="previous .task-list" hx-swap="beforeend" hx-on::after-request="this.reset()">
         <input type="text" name="title" placeholder="Add task..." required>
+        <select name="priority" class="add-priority">
+            <option value="">—</option>
+            <option value="low">Low</option>
+            <option value="medium">Med</option>
+            <option value="high">High</option>
+        </select>
+        <input type="date" name="due_date" class="add-due" title="Due date">
         <button class="btn btn-sm btn-accent" type="submit">+</button>
     </form>
 </div>

@@ -45,6 +45,39 @@ func validateDesc(desc string) error {
 	return nil
 }
 
+func validatePriority(s string) (int, error) {
+	switch strings.ToLower(s) {
+	case "none", "0", "":
+		return 0, nil
+	case "low", "1":
+		return 1, nil
+	case "medium", "med", "2":
+		return 2, nil
+	case "high", "3":
+		return 3, nil
+	default:
+		return 0, fmt.Errorf("invalid priority %q (use none/low/medium/high or 0-3)", s)
+	}
+}
+
+func validateDueDate(s string) error {
+	if s == "" {
+		return nil
+	}
+	if len(s) != 10 || s[4] != '-' || s[7] != '-' {
+		return fmt.Errorf("invalid due date %q (use YYYY-MM-DD)", s)
+	}
+	for i, c := range s {
+		if i == 4 || i == 7 {
+			continue
+		}
+		if c < '0' || c > '9' {
+			return fmt.Errorf("invalid due date %q (use YYYY-MM-DD)", s)
+		}
+	}
+	return nil
+}
+
 // --- helpers ---
 
 func parseID(s string) (int, error) {
@@ -466,18 +499,32 @@ func cmdAdd(db *sql.DB, projectID int, args []string) error {
 	fs.SetOutput(io.Discard)
 	phase := fs.String("phase", "", "phase (ID or title)")
 	desc := fs.String("desc", "", "description (markdown)")
+	priorityFlag := fs.String("priority", "", "priority (none/low/medium/high)")
+	dueFlag := fs.String("due", "", "due date (YYYY-MM-DD)")
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
 	if fs.NArg() < 1 {
-		return fmt.Errorf(`usage: roadmap add "title" [--phase "Phase"] [--desc "..."]`)
+		return fmt.Errorf(`usage: roadmap add "title" [--phase "Phase"] [--desc "..."] [--priority low/medium/high] [--due YYYY-MM-DD]`)
 	}
 	title := fs.Arg(0)
 	if err := validateTitle(title); err != nil {
 		return err
 	}
 	if err := validateDesc(*desc); err != nil {
+		return err
+	}
+
+	priority := 0
+	if *priorityFlag != "" {
+		var err error
+		priority, err = validatePriority(*priorityFlag)
+		if err != nil {
+			return err
+		}
+	}
+	if err := validateDueDate(*dueFlag); err != nil {
 		return err
 	}
 
@@ -498,8 +545,8 @@ func cmdAdd(db *sql.DB, projectID int, args []string) error {
 	}
 
 	res, err := db.Exec(
-		`INSERT INTO tasks (project_id, title, description, phase_id, sort_order) VALUES (?, ?, ?, ?, ?)`,
-		projectID, title, *desc, phaseID, maxOrder+1,
+		`INSERT INTO tasks (project_id, title, description, phase_id, sort_order, priority, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		projectID, title, *desc, phaseID, maxOrder+1, priority, *dueFlag,
 	)
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
@@ -587,7 +634,8 @@ func cmdCurrent(db *sql.DB, projectID int) error {
 		if t.PhaseTitle != "" {
 			phase = fmt.Sprintf(" [%s]", t.PhaseTitle)
 		}
-		fmt.Printf("#%d %s%s\n", t.ID, t.Title, phase)
+		extra := taskExtra(t)
+		fmt.Printf("#%d %s%s%s\n", t.ID, t.Title, phase, extra)
 		if t.Description != "" {
 			fmt.Print(indentDesc(t.Description, "   "))
 		}
@@ -617,7 +665,8 @@ func cmdNext(db *sql.DB, projectID int) error {
 		if t.PhaseTitle != "" {
 			phase = fmt.Sprintf(" [%s]", t.PhaseTitle)
 		}
-		fmt.Printf("#%d %s%s\n", t.ID, t.Title, phase)
+		extra := taskExtra(t)
+		fmt.Printf("#%d %s%s%s\n", t.ID, t.Title, phase, extra)
 		if t.Description != "" {
 			fmt.Print(indentDesc(t.Description, "   "))
 		}
@@ -625,7 +674,16 @@ func cmdNext(db *sql.DB, projectID int) error {
 	return nil
 }
 
-func cmdList(db *sql.DB, projectID int) error {
+func cmdList(db *sql.DB, projectID int, args []string) error {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	statusFilter := fs.String("status", "", "filter by status (pending/active/done)")
+	phaseFilter := fs.String("phase", "", "filter by phase (ID or title)")
+	searchFilter := fs.String("search", "", "search title and description")
+	if err := fs.Parse(reorderArgs(args)); err != nil {
+		return err
+	}
+
 	phaseRows, err := db.Query(
 		`SELECT id, project_id, title, description, sort_order, created_at FROM phases WHERE project_id = ? ORDER BY sort_order`,
 		projectID,
@@ -639,11 +697,31 @@ func cmdList(db *sql.DB, projectID int) error {
 		return fmt.Errorf("error: %w", err)
 	}
 
+	where := `WHERE t.project_id = ?`
+	params := []any{projectID}
+
+	if *statusFilter != "" {
+		where += ` AND t.status = ?`
+		params = append(params, *statusFilter)
+	}
+	if *phaseFilter != "" {
+		phaseID, err := resolvePhase(db, projectID, *phaseFilter)
+		if err != nil {
+			return err
+		}
+		where += ` AND t.phase_id = ?`
+		params = append(params, phaseID.Int64)
+	}
+	if *searchFilter != "" {
+		where += ` AND (t.title LIKE ? OR t.description LIKE ?)`
+		q := "%" + *searchFilter + "%"
+		params = append(params, q, q)
+	}
+
 	rows, err := db.Query(
-		`SELECT `+taskSelectCols+` `+taskFromJoin+`
-		WHERE t.project_id = ?
+		`SELECT `+taskSelectCols+` `+taskFromJoin+` `+where+`
 		ORDER BY COALESCE(p.sort_order, 999999), t.sort_order, t.id`,
-		projectID,
+		params...,
 	)
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
@@ -711,12 +789,14 @@ func cmdEdit(db *sql.DB, projectID int, args []string) error {
 	title := fs.String("title", "", "new title")
 	phase := fs.String("phase", "", "phase (ID, title, or empty to clear)")
 	desc := fs.String("desc", "", "description (markdown)")
+	priorityFlag := fs.String("priority", "", "priority (none/low/medium/high)")
+	dueFlag := fs.String("due", "", "due date (YYYY-MM-DD or empty to clear)")
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
 	if fs.NArg() < 1 {
-		return fmt.Errorf(`usage: roadmap edit <id> [--title "..."] [--phase "..."] [--desc "..."]`)
+		return fmt.Errorf(`usage: roadmap edit <id> [--title "..."] [--phase "..."] [--desc "..."] [--priority ...] [--due YYYY-MM-DD]`)
 	}
 	id, err := parseID(fs.Arg(0))
 	if err != nil {
@@ -725,17 +805,23 @@ func cmdEdit(db *sql.DB, projectID int, args []string) error {
 
 	phaseSet := false
 	descSet := false
+	prioritySet := false
+	dueSet := false
 	for _, a := range args {
-		if a == "--phase" {
+		switch a {
+		case "--phase":
 			phaseSet = true
-		}
-		if a == "--desc" {
+		case "--desc":
 			descSet = true
+		case "--priority":
+			prioritySet = true
+		case "--due":
+			dueSet = true
 		}
 	}
 
-	if *title == "" && !phaseSet && !descSet {
-		return fmt.Errorf("specify --title, --phase, or --desc")
+	if *title == "" && !phaseSet && !descSet && !prioritySet && !dueSet {
+		return fmt.Errorf("specify --title, --phase, --desc, --priority, or --due")
 	}
 
 	if *title != "" {
@@ -751,6 +837,23 @@ func cmdEdit(db *sql.DB, projectID int, args []string) error {
 			return err
 		}
 		if err := execDB(db, `UPDATE tasks SET description = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ? AND project_id = ?`, *desc, id, projectID); err != nil {
+			return err
+		}
+	}
+	if prioritySet {
+		p, err := validatePriority(*priorityFlag)
+		if err != nil {
+			return err
+		}
+		if err := execDB(db, `UPDATE tasks SET priority = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ? AND project_id = ?`, p, id, projectID); err != nil {
+			return err
+		}
+	}
+	if dueSet {
+		if err := validateDueDate(*dueFlag); err != nil {
+			return err
+		}
+		if err := execDB(db, `UPDATE tasks SET due_date = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ? AND project_id = ?`, *dueFlag, id, projectID); err != nil {
 			return err
 		}
 	}
