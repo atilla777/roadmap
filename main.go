@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}
+
 func printUsage() {
 	fmt.Println(`roadmap — project task tracker
 
@@ -68,6 +73,8 @@ func main() {
 	cmd := args[0]
 	rest := args[1:]
 
+	var err error
+
 	// Project subcommands don't need project resolution
 	if cmd == "project" {
 		if len(rest) < 1 {
@@ -76,16 +83,19 @@ func main() {
 		}
 		switch rest[0] {
 		case "add":
-			cmdProjectAdd(db, rest[1:])
+			err = cmdProjectAdd(db, rest[1:])
 		case "list":
-			cmdProjectList(db)
+			err = cmdProjectList(db)
 		case "edit":
-			cmdProjectEdit(db, rest[1:])
+			err = cmdProjectEdit(db, rest[1:])
 		case "remove":
-			cmdProjectRemove(db, rest[1:])
+			err = cmdProjectRemove(db, rest[1:])
 		default:
 			fmt.Fprintf(os.Stderr, "unknown project command: %s\n", rest[0])
 			os.Exit(1)
+		}
+		if err != nil {
+			fatal(err)
 		}
 		return
 	}
@@ -107,49 +117,55 @@ func main() {
 		}
 		switch rest[0] {
 		case "add":
-			cmdPhaseAdd(db, proj.ID, rest[1:])
+			err = cmdPhaseAdd(db, proj.ID, rest[1:])
 		case "list":
-			cmdPhaseList(db, proj.ID)
+			err = cmdPhaseList(db, proj.ID)
 		case "edit":
-			cmdPhaseEdit(db, proj.ID, rest[1:])
+			err = cmdPhaseEdit(db, proj.ID, rest[1:])
 		case "remove":
-			cmdPhaseRemove(db, proj.ID, rest[1:])
+			err = cmdPhaseRemove(db, proj.ID, rest[1:])
 		case "move":
-			cmdPhaseMove(db, proj.ID, rest[1:])
+			err = cmdPhaseMove(db, proj.ID, rest[1:])
 		default:
 			fmt.Fprintf(os.Stderr, "unknown phase command: %s\n", rest[0])
 			os.Exit(1)
+		}
+		if err != nil {
+			fatal(err)
 		}
 		return
 	}
 
 	switch cmd {
 	case "add":
-		cmdAdd(db, proj.ID, rest)
+		err = cmdAdd(db, proj.ID, rest)
 	case "start":
-		cmdStart(db, proj.ID, rest)
+		err = cmdStart(db, proj.ID, rest)
 	case "done":
-		cmdDone(db, proj.ID, rest)
+		err = cmdDone(db, proj.ID, rest)
 	case "current":
-		cmdCurrent(db, proj.ID)
+		err = cmdCurrent(db, proj.ID)
 	case "next":
-		cmdNext(db, proj.ID)
+		err = cmdNext(db, proj.ID)
 	case "list":
-		cmdList(db, proj.ID)
+		err = cmdList(db, proj.ID)
 	case "context":
-		cmdContext(db, proj.ID, proj.Name)
+		err = cmdContext(db, proj.ID, proj.Name)
 	case "edit":
-		cmdEdit(db, proj.ID, rest)
+		err = cmdEdit(db, proj.ID, rest)
 	case "move":
-		cmdMove(db, proj.ID, rest)
+		err = cmdMove(db, proj.ID, rest)
 	case "remove":
-		cmdRemove(db, proj.ID, rest)
+		err = cmdRemove(db, proj.ID, rest)
 	case "help", "--help", "-h":
 		printUsage()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", cmd)
 		printUsage()
 		os.Exit(1)
+	}
+	if err != nil {
+		fatal(err)
 	}
 }
 

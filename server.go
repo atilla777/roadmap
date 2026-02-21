@@ -59,6 +59,38 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, contentTemplate 
 	tmpl.ExecuteTemplate(w, "layout", page)
 }
 
+// pathID parses the {id} path value and returns 400 on failure.
+func pathID(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid id", 400)
+		return 0, false
+	}
+	return id, true
+}
+
+// validateWebTitle checks title is non-empty and within length limit.
+func validateWebTitle(w http.ResponseWriter, title string) bool {
+	if strings.TrimSpace(title) == "" {
+		http.Error(w, "title required", 400)
+		return false
+	}
+	if len(title) > maxTitleLen {
+		http.Error(w, fmt.Sprintf("title too long (max %d characters)", maxTitleLen), 400)
+		return false
+	}
+	return true
+}
+
+// validateWebDesc checks description length limit.
+func validateWebDesc(w http.ResponseWriter, desc string) bool {
+	if len(desc) > maxDescLen {
+		http.Error(w, fmt.Sprintf("description too long (max %d characters)", maxDescLen), 400)
+		return false
+	}
+	return true
+}
+
 func cmdServe(db *sql.DB, args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fs.Int("port", 8080, "port to listen on")
@@ -115,9 +147,8 @@ func handleProjects(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 func handleProject(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		projectID, err := strconv.Atoi(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "invalid project id", 400)
+		projectID, ok := pathID(w, r)
+		if !ok {
 			return
 		}
 
@@ -187,10 +218,19 @@ func handleProject(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 func handlePhaseCreate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		projectID, _ := strconv.Atoi(r.PathValue("id"))
+		projectID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		title := strings.TrimSpace(r.FormValue("title"))
-		if title == "" {
-			http.Error(w, "title required", 400)
+		if !validateWebTitle(w, title) {
+			return
+		}
+
+		// Verify project exists
+		var exists int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM projects WHERE id = ?`, projectID).Scan(&exists); err != nil || exists == 0 {
+			http.Error(w, "project not found", 404)
 			return
 		}
 
@@ -218,7 +258,10 @@ func handlePhaseCreate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 func handlePhaseUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(r.PathValue("id"))
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		r.ParseForm()
 
 		title := r.FormValue("title")
@@ -226,9 +269,16 @@ func handlePhaseUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 		descSet := r.Form.Has("description")
 
 		if title != "" {
+			if len(title) > maxTitleLen {
+				http.Error(w, fmt.Sprintf("title too long (max %d characters)", maxTitleLen), 400)
+				return
+			}
 			db.Exec(`UPDATE phases SET title = ? WHERE id = ?`, title, id)
 		}
 		if descSet {
+			if !validateWebDesc(w, desc) {
+				return
+			}
 			db.Exec(`UPDATE phases SET description = ? WHERE id = ?`, desc, id)
 		}
 
@@ -260,7 +310,10 @@ func handlePhaseUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 func handlePhaseDelete(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(r.PathValue("id"))
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		db.Exec(`UPDATE tasks SET phase_id = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE phase_id = ?`, id)
 		db.Exec(`DELETE FROM phases WHERE id = ?`, id)
 		w.WriteHeader(200)
@@ -269,12 +322,19 @@ func handlePhaseDelete(db *sql.DB) http.HandlerFunc {
 
 func handlePhaseOrder(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(r.PathValue("id"))
-		newPos, _ := strconv.Atoi(r.FormValue("position"))
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		newPos, err := strconv.Atoi(r.FormValue("position"))
+		if err != nil {
+			http.Error(w, "invalid position", 400)
+			return
+		}
 
 		// Get phase's project_id
 		var projectID int
-		err := db.QueryRow(`SELECT project_id FROM phases WHERE id = ?`, id).Scan(&projectID)
+		err = db.QueryRow(`SELECT project_id FROM phases WHERE id = ?`, id).Scan(&projectID)
 		if err != nil {
 			http.Error(w, "phase not found", 404)
 			return
@@ -328,10 +388,12 @@ func handlePhaseOrder(db *sql.DB) http.HandlerFunc {
 
 func handleTaskCreateInPhase(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		phaseID, _ := strconv.Atoi(r.PathValue("id"))
+		phaseID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		title := strings.TrimSpace(r.FormValue("title"))
-		if title == "" {
-			http.Error(w, "title required", 400)
+		if !validateWebTitle(w, title) {
 			return
 		}
 
@@ -363,10 +425,19 @@ func handleTaskCreateInPhase(db *sql.DB, tmpl *template.Template) http.HandlerFu
 
 func handleTaskCreateBacklog(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		projectID, _ := strconv.Atoi(r.PathValue("id"))
+		projectID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		title := strings.TrimSpace(r.FormValue("title"))
-		if title == "" {
-			http.Error(w, "title required", 400)
+		if !validateWebTitle(w, title) {
+			return
+		}
+
+		// Verify project exists
+		var exists int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM projects WHERE id = ?`, projectID).Scan(&exists); err != nil || exists == 0 {
+			http.Error(w, "project not found", 404)
 			return
 		}
 
@@ -390,13 +461,24 @@ func handleTaskCreateBacklog(db *sql.DB, tmpl *template.Template) http.HandlerFu
 
 func handleTaskUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(r.PathValue("id"))
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 
 		r.ParseForm()
 		status := r.FormValue("status")
 		title := r.FormValue("title")
 		desc := r.FormValue("description")
 		descSet := r.Form.Has("description")
+
+		if title != "" && len(title) > maxTitleLen {
+			http.Error(w, fmt.Sprintf("title too long (max %d characters)", maxTitleLen), 400)
+			return
+		}
+		if descSet && !validateWebDesc(w, desc) {
+			return
+		}
 
 		if status != "" {
 			db.Exec(`UPDATE tasks SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now') WHERE id = ?`, status, id)
@@ -421,7 +503,10 @@ func handleTaskUpdate(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 
 func handleTaskDelete(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(r.PathValue("id"))
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		db.Exec(`DELETE FROM tasks WHERE id = ?`, id)
 		w.WriteHeader(200)
 	}
@@ -429,13 +514,20 @@ func handleTaskDelete(db *sql.DB) http.HandlerFunc {
 
 func handleTaskOrder(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		taskID, _ := strconv.Atoi(r.PathValue("id"))
-		newPos, _ := strconv.Atoi(r.FormValue("position"))
+		taskID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		newPos, err := strconv.Atoi(r.FormValue("position"))
+		if err != nil {
+			http.Error(w, "invalid position", 400)
+			return
+		}
 
 		// Get task's phase
 		var phaseID sql.NullInt64
 		var projectID int
-		err := db.QueryRow(`SELECT project_id, phase_id FROM tasks WHERE id = ?`, taskID).Scan(&projectID, &phaseID)
+		err = db.QueryRow(`SELECT project_id, phase_id FROM tasks WHERE id = ?`, taskID).Scan(&projectID, &phaseID)
 		if err != nil {
 			http.Error(w, "task not found", 404)
 			return
